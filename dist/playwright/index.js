@@ -2,6 +2,17 @@
  * @license
  * MIT License
  */
+/**
+ * Playwright 浏览器管理模块
+ *
+ * 本模块使用 playwright-core 官方包来管理浏览器的下载和缓存。
+ * 所有浏览器查找、下载路径获取和浏览器下载逻辑均直接来自 Playwright 官方实现。
+ *
+ * Playwright browser management module
+ *
+ * This module uses the official playwright-core package to manage browser downloads and caching.
+ * All browser finding, download path retrieval, and browser download logic comes directly from the official Playwright implementation.
+ */
 import debug from 'debug';
 import path from 'node:path';
 import os from 'node:os';
@@ -28,11 +39,14 @@ async function getRegistryModule() {
     try {
         // 尝试导入 Playwright 的内部注册表模块
         // Try to import Playwright's internal registry module
-        const playwrightPath = require.resolve('playwright-core');
-        const basePath = path.dirname(playwrightPath);
-        // 注册表通常位于 lib/server/registry
-        // Registry is usually located at lib/server/registry
-        const registryPath = path.join(basePath, 'lib', 'server', 'registry', 'index.js');
+        // 动态导入 playwright-core 以获取其路径
+        // Dynamically import playwright-core to get its path
+        const playwrightCore = await import('playwright-core');
+        const playwrightPath = playwrightCore.__filename ||
+            new URL(import.meta.url).pathname.replace(/\/[^/]+$/, '');
+        // 注册表通常位于相对于 playwright-core 模块的路径
+        // Registry is usually located relative to the playwright-core module
+        const registryPath = path.resolve(path.dirname(playwrightPath), 'node_modules', 'playwright-core', 'lib', 'server', 'registry', 'index.js');
         if (fs.existsSync(registryPath)) {
             registryModule = await import(registryPath);
             debugPlaywright('Loaded registry module from:', registryPath);
@@ -196,6 +210,12 @@ export async function findBrowser(options = {}) {
  */
 function findBrowserFallback(browserName, cacheDir, platform) {
     try {
+        // 验证 browserName 是有效的 BrowserType
+        // Validate that browserName is a valid BrowserType
+        const validBrowserTypes = ['chromium', 'firefox', 'webkit', 'chrome', 'chrome-headless-shell'];
+        const browserType = validBrowserTypes.includes(browserName)
+            ? browserName
+            : 'chromium';
         // 构建预期的浏览器路径
         // Build expected browser path
         const browserDir = path.join(cacheDir, browserName);
@@ -236,7 +256,7 @@ function findBrowserFallback(browserName, cacheDir, platform) {
             }
             if (fs.existsSync(executablePath)) {
                 return {
-                    browser: browserName,
+                    browser: browserType,
                     executablePath,
                     buildId: dir,
                     platform,

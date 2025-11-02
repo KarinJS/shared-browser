@@ -15,7 +15,6 @@
  * All browser finding, download path retrieval, and browser download logic comes directly from the official Playwright implementation.
  */
 
-import { _electron as electron } from 'playwright-core';
 import debug from 'debug';
 import type {
   FindBrowserOptions,
@@ -54,12 +53,24 @@ async function getRegistryModule() {
   try {
     // 尝试导入 Playwright 的内部注册表模块
     // Try to import Playwright's internal registry module
-    const playwrightPath = require.resolve('playwright-core');
-    const basePath = path.dirname(playwrightPath);
     
-    // 注册表通常位于 lib/server/registry
-    // Registry is usually located at lib/server/registry
-    const registryPath = path.join(basePath, 'lib', 'server', 'registry', 'index.js');
+    // 动态导入 playwright-core 以获取其路径
+    // Dynamically import playwright-core to get its path
+    const playwrightCore = await import('playwright-core');
+    const playwrightPath = (playwrightCore as any).__filename || 
+                           new URL(import.meta.url).pathname.replace(/\/[^/]+$/, '');
+    
+    // 注册表通常位于相对于 playwright-core 模块的路径
+    // Registry is usually located relative to the playwright-core module
+    const registryPath = path.resolve(
+      path.dirname(playwrightPath),
+      'node_modules',
+      'playwright-core',
+      'lib',
+      'server',
+      'registry',
+      'index.js'
+    );
     
     if (fs.existsSync(registryPath)) {
       registryModule = await import(registryPath);
@@ -243,6 +254,13 @@ function findBrowserFallback(
   platform: Platform
 ): BrowserInfo | null {
   try {
+    // 验证 browserName 是有效的 BrowserType
+    // Validate that browserName is a valid BrowserType
+    const validBrowserTypes: BrowserType[] = ['chromium', 'firefox', 'webkit', 'chrome', 'chrome-headless-shell'];
+    const browserType = validBrowserTypes.includes(browserName as BrowserType) 
+      ? (browserName as BrowserType) 
+      : 'chromium';
+
     // 构建预期的浏览器路径
     // Build expected browser path
     const browserDir = path.join(cacheDir, browserName);
@@ -286,7 +304,7 @@ function findBrowserFallback(
 
       if (fs.existsSync(executablePath)) {
         return {
-          browser: browserName as BrowserType,
+          browser: browserType,
           executablePath,
           buildId: dir,
           platform,
