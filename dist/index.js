@@ -2,17 +2,22 @@ import { n as __export, r as __toESM, t as __commonJS } from "./chunk-DUEDWNxO.j
 import assert from "node:assert";
 import { spawn, spawnSync } from "node:child_process";
 import fs, { createReadStream, createWriteStream, existsSync, readFileSync } from "node:fs";
-import { mkdir, readFile, readdir, unlink } from "node:fs/promises";
+import { mkdir, readFile, readdir, rm, unlink } from "node:fs/promises";
 import os from "node:os";
 import * as path$1 from "node:path";
 import path from "node:path";
 import ProgressBarClass from "progress";
-import * as http from "node:http";
-import * as https from "node:https";
+import * as http$1 from "node:http";
+import http from "node:http";
+import * as https$1 from "node:https";
+import https from "node:https";
 import { URL as URL$1, urlToHttpOptions } from "node:url";
 import { ProxyAgent } from "proxy-agent";
 import debug, { default as debug$1 } from "debug";
 import { Stream } from "node:stream";
+import extractZip from "extract-zip";
+import tarFs from "tar-fs";
+import { createGunzip } from "node:zlib";
 
 //#region src/puppeteer-vendor/browser-data/types.ts
 /**
@@ -1534,14 +1539,14 @@ function httpRequest(url, method, response, keepAlive = true) {
 			res.resume();
 		} else response(res);
 	};
-	const request = options.protocol === "https:" ? https.request(options, requestCallback) : http.request(options, requestCallback);
+	const request = options.protocol === "https:" ? https$1.request(options, requestCallback) : http$1.request(options, requestCallback);
 	request.end();
 	return request;
 }
 /**
 * @internal
 */
-function downloadFile(url, destinationPath, progressCallback) {
+function downloadFile$1(url, destinationPath, progressCallback) {
 	return new Promise((resolve, reject) => {
 		let downloadedBytes = 0;
 		let totalBytes = 0;
@@ -2252,7 +2257,7 @@ const internalConstantsForTesting = {
 * @internal
 */
 async function extractTar(tarPath, folderPath, decompressUtilityName) {
-	const tarFs = await import("tar-fs");
+	const tarFs$1 = await import("tar-fs");
 	return await new Promise((fulfill, reject) => {
 		function handleError(utilityName) {
 			return (error) => {
@@ -2267,7 +2272,7 @@ async function extractTar(tarPath, folderPath, decompressUtilityName) {
 		] }).once("error", handleError(decompressUtilityName)).once("exit", (code) => {
 			debugFileUtil(`${decompressUtilityName} exited, code=${code}`);
 		});
-		const tar = tarFs.extract(folderPath);
+		const tar = tarFs$1.extract(folderPath);
 		tar.once("error", handleError("tar"));
 		tar.once("finish", fulfill);
 		createReadStream(tarPath).pipe(createTransformStream(unpack)).pipe(tar);
@@ -2402,7 +2407,7 @@ async function installUrl(url, options) {
 		if (existsSync(archivePath)) return archivePath;
 		debugInstall(`Downloading binary from ${url}`);
 		debugTime("download");
-		await downloadFile(url, archivePath, downloadProgressCallback);
+		await downloadFile$1(url, archivePath, downloadProgressCallback);
 		debugTimeEnd("download");
 		return archivePath;
 	}
@@ -2418,7 +2423,7 @@ async function installUrl(url, options) {
 		debugInstall(`Downloading binary from ${url}`);
 		try {
 			debugTime("download");
-			await downloadFile(url, archivePath, downloadProgressCallback);
+			await downloadFile$1(url, archivePath, downloadProgressCallback);
 		} finally {
 			debugTimeEnd("download");
 		}
@@ -2496,7 +2501,7 @@ function toMegabytes(bytes) {
 //#endregion
 //#region src/puppeteer.ts
 var puppeteer_exports = /* @__PURE__ */ __export({
-	downloadBrowser: () => downloadBrowser$1,
+	downloadBrowser: () => downloadBrowser$2,
 	findBrowser: () => findBrowser$1,
 	getDownloadPath: () => getDownloadPath$1
 });
@@ -2580,7 +2585,7 @@ function getDownloadPath$1(options) {
 * 下载浏览器
 * Download browser
 */
-async function downloadBrowser$1(options) {
+async function downloadBrowser$2(options) {
 	const browser = options.browser;
 	const cacheDir = options.cacheDir || getDefaultCacheDir$1();
 	const platform = toPuppeteerPlatform(options.platform) || detectBrowserPlatform();
@@ -2627,9 +2632,134 @@ async function downloadBrowser$1(options) {
 }
 
 //#endregion
+//#region src/playwright-vendor/utils/debugLogger.ts
+const debugLogger = {
+	log: debug("pw:browser"),
+	error: debug("pw:browser:error")
+};
+
+//#endregion
+//#region src/playwright-vendor/utils/fileUtils.ts
+async function removeFolders(dirs) {
+	await Promise.all(dirs.map(async (dir) => {
+		try {
+			await rm(dir, {
+				recursive: true,
+				force: true
+			});
+		} catch (error) {}
+	}));
+}
+
+//#endregion
+//#region src/playwright-vendor/browserFetcher.ts
+/**
+* 下载文件
+* Download file
+*/
+async function downloadFile(url, dest, progressCallback) {
+	return new Promise((resolve, reject) => {
+		const protocol = url.startsWith("https") ? https : http;
+		const agent = process.env.HTTP_PROXY || process.env.HTTPS_PROXY ? new ProxyAgent() : void 0;
+		protocol.get(url, { agent }, (response) => {
+			if (response.statusCode === 302 || response.statusCode === 301) {
+				downloadFile(response.headers.location, dest, progressCallback).then(resolve).catch(reject);
+				return;
+			}
+			if (response.statusCode !== 200) {
+				reject(/* @__PURE__ */ new Error(`HTTP ${response.statusCode}: ${response.statusMessage}`));
+				return;
+			}
+			const totalBytes = parseInt(response.headers["content-length"] || "0", 10);
+			let downloadedBytes = 0;
+			const file = createWriteStream(dest);
+			response.on("data", (chunk) => {
+				downloadedBytes += chunk.length;
+				if (progressCallback) progressCallback(downloadedBytes, totalBytes);
+			});
+			response.pipe(file);
+			file.on("finish", () => {
+				file.close();
+				resolve();
+			});
+			file.on("error", (err) => {
+				fs.unlinkSync(dest);
+				reject(err);
+			});
+		}).on("error", reject);
+	});
+}
+/**
+* 解压文件
+* Extract archive
+*/
+async function extractArchive(archivePath, destPath) {
+	await mkdir(destPath, { recursive: true });
+	if (archivePath.endsWith(".zip")) await extractZip(archivePath, { dir: destPath });
+	else if (archivePath.endsWith(".tar.gz")) return new Promise((resolve, reject) => {
+		fs.createReadStream(archivePath).pipe(createGunzip()).pipe(tarFs.extract(destPath)).on("finish", resolve).on("error", reject);
+	});
+	else throw new Error(`Unsupported archive format: ${archivePath}`);
+}
+/**
+* 下载并安装浏览器
+* Download and install browser
+*/
+async function downloadBrowser(options) {
+	const { browser, buildNumber, downloadPath, downloadURL, progressCallback } = options;
+	debugLogger.log(`Downloading ${browser.name} ${buildNumber} from ${downloadURL}`);
+	await mkdir(downloadPath, { recursive: true });
+	const archiveName = path.basename(downloadURL);
+	const archivePath = path.join(downloadPath, archiveName);
+	try {
+		await downloadFile(downloadURL, archivePath, progressCallback);
+		debugLogger.log(`Downloaded to ${archivePath}`);
+	} catch (error) {
+		await removeFolders([archivePath]);
+		throw error;
+	}
+	try {
+		await extractArchive(archivePath, downloadPath);
+		debugLogger.log(`Extracted to ${downloadPath}`);
+	} catch (error) {
+		await removeFolders([downloadPath]);
+		throw error;
+	}
+	try {
+		await removeFolders([archivePath]);
+	} catch (error) {}
+	return downloadPath;
+}
+/**
+* 构建下载 URL
+* Build download URL
+*/
+function getDownloadURL(browser, revision, platform) {
+	const host = "https://playwright.azureedge.net";
+	let archivePrefix;
+	let archiveSuffix;
+	if (browser === "chromium") {
+		archivePrefix = "chromium";
+		archiveSuffix = platform === "win64" ? "zip" : "zip";
+		if (platform === "linux") archiveSuffix = "zip";
+		if (platform.startsWith("mac")) archiveSuffix = "zip";
+	} else if (browser === "firefox") {
+		archivePrefix = "firefox";
+		archiveSuffix = platform === "win64" ? "zip" : "tar.gz";
+		if (platform.startsWith("mac")) archiveSuffix = "zip";
+	} else if (browser === "webkit") {
+		archivePrefix = "webkit";
+		archiveSuffix = platform === "win64" ? "zip" : "zip";
+		if (platform === "linux") archiveSuffix = "zip";
+		if (platform.startsWith("mac")) archiveSuffix = "zip";
+	} else throw new Error(`Unsupported browser: ${browser}`);
+	return `${host}/builds/${archivePrefix}/${revision}/${archivePrefix}-${platform === "mac-arm64" ? "mac-arm64" : platform === "mac" ? "mac" : platform === "win64" ? "win64" : "linux"}.${archiveSuffix}`;
+}
+
+//#endregion
 //#region src/playwright.ts
 var playwright_exports = /* @__PURE__ */ __export({
-	downloadBrowser: () => downloadBrowser,
+	downloadBrowser: () => downloadBrowser$1,
 	findBrowser: () => findBrowser,
 	getDownloadPath: () => getDownloadPath
 });
@@ -2676,6 +2806,16 @@ function detectPlatform() {
 	if (platform === "darwin") return arch === "arm64" ? "mac_arm" : "mac";
 	else if (platform === "linux") return "linux";
 	else if (platform === "win32") return "win64";
+	return "linux";
+}
+/**
+* 转换平台类型
+* Convert platform type
+*/
+function toHostPlatform(platform) {
+	if (platform === "mac_arm") return "mac-arm64";
+	if (platform === "mac") return "mac";
+	if (platform === "win64" || platform === "win32") return "win64";
 	return "linux";
 }
 /**
@@ -2760,25 +2900,55 @@ function getDownloadPath(options) {
 /**
 * 下载浏览器
 * Download browser
-* 
-* 注意：Playwright 的下载逻辑非常复杂，涉及多个内部模块。
-* 建议使用 playwright CLI 或直接安装 playwright 包来下载浏览器。
-* 
-* Note: Playwright's download logic is very complex and involves multiple internal modules.
-* It's recommended to use the playwright CLI or install the playwright package directly to download browsers.
 */
-async function downloadBrowser(options) {
+async function downloadBrowser$1(options) {
 	const browser = options.browser;
 	const cacheDir = options.cacheDir || getDefaultCacheDir();
 	const platform = options.platform || detectPlatform();
 	const browserName = toPlaywrightBrowserName(browser);
+	const hostPlat = toHostPlatform(platform);
 	debugPlaywright("Downloading browser:", {
 		browser: browserName,
 		cacheDir,
 		platform
 	});
-	if (!(await loadBrowsersConfig()).browsers.find((b) => b.name === browserName)) throw new Error(`Unknown browser: ${browserName}`);
-	throw new Error(`Browser download for Playwright requires the full playwright package or CLI. Please use: npx playwright install ${browserName}\nOr install the @playwright/test package.`);
+	const browserDesc = (await loadBrowsersConfig()).browsers.find((b) => b.name === browserName);
+	if (!browserDesc) throw new Error(`Unknown browser: ${browserName}`);
+	const buildNumber = options.buildId || browserDesc.revision;
+	const downloadURL = getDownloadURL(browserName, buildNumber, hostPlat);
+	const downloadPath = path.join(cacheDir, browserName, buildNumber);
+	debugPlaywright("Download URL:", downloadURL);
+	debugPlaywright("Download path:", downloadPath);
+	const existing = await findBrowser({
+		browser,
+		cacheDir,
+		platform
+	});
+	if (existing && existing.buildId === buildNumber) {
+		debugPlaywright("Browser already installed");
+		return existing;
+	}
+	try {
+		await downloadBrowser({
+			browser: browserDesc,
+			buildNumber,
+			downloadPath,
+			downloadURL,
+			platform: hostPlat,
+			progressCallback: options.progressCallback
+		});
+		debugPlaywright("Browser downloaded successfully");
+	} catch (error) {
+		debugPlaywright("Error downloading browser:", error);
+		throw new Error(`Failed to download ${browserName}: ${error instanceof Error ? error.message : String(error)}`);
+	}
+	const installed = await findBrowser({
+		browser,
+		cacheDir,
+		platform
+	});
+	if (!installed) throw new Error("Browser was downloaded but could not be found");
+	return installed;
 }
 
 //#endregion

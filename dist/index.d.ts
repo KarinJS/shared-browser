@@ -156,12 +156,6 @@ declare function getDownloadPath(options: GetDownloadPathOptions): string;
 /**
  * 下载浏览器
  * Download browser
- *
- * 注意：Playwright 的下载逻辑非常复杂，涉及多个内部模块。
- * 建议使用 playwright CLI 或直接安装 playwright 包来下载浏览器。
- *
- * Note: Playwright's download logic is very complex and involves multiple internal modules.
- * It's recommended to use the playwright CLI or install the playwright package directly to download browsers.
  */
 declare function downloadBrowser(options: DownloadBrowserOptions): Promise<BrowserInfo>;
 //#endregion

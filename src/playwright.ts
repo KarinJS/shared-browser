@@ -24,17 +24,10 @@ import path from 'node:path';
 import os from 'node:os';
 import fs from 'node:fs';
 import { readFile } from 'node:fs/promises';
+import { hostPlatform, type HostPlatform } from './playwright-vendor/utils/hostPlatform.js';
+import { downloadBrowser as fetchBrowser, getDownloadURL, type BrowserDescriptor } from './playwright-vendor/browserFetcher.js';
 
 const debugPlaywright = debug('shared-browser:playwright');
-
-// Playwright 浏览器配置（从 browsers.json 提取）
-// Playwright browser configuration (extracted from browsers.json)
-interface BrowserDescriptor {
-  name: string;
-  revision: string;
-  installByDefault: boolean;
-  browserVersion?: string;
-}
 
 let browsersConfig: { browsers: BrowserDescriptor[] } | null = null;
 
@@ -86,6 +79,17 @@ function detectPlatform(): Platform {
     return 'win64';
   }
 
+  return 'linux';
+}
+
+/**
+ * 转换平台类型
+ * Convert platform type
+ */
+function toHostPlatform(platform: Platform): HostPlatform {
+  if (platform === 'mac_arm') return 'mac-arm64';
+  if (platform === 'mac') return 'mac';
+  if (platform === 'win64' || platform === 'win32') return 'win64';
   return 'linux';
 }
 
@@ -231,12 +235,6 @@ export function getDownloadPath(options: GetDownloadPathOptions): string {
 /**
  * 下载浏览器
  * Download browser
- * 
- * 注意：Playwright 的下载逻辑非常复杂，涉及多个内部模块。
- * 建议使用 playwright CLI 或直接安装 playwright 包来下载浏览器。
- * 
- * Note: Playwright's download logic is very complex and involves multiple internal modules.
- * It's recommended to use the playwright CLI or install the playwright package directly to download browsers.
  */
 export async function downloadBrowser(
   options: DownloadBrowserOptions
@@ -246,6 +244,7 @@ export async function downloadBrowser(
   const platform = options.platform || detectPlatform();
 
   const browserName = toPlaywrightBrowserName(browser);
+  const hostPlat = toHostPlatform(platform);
 
   debugPlaywright('Downloading browser:', { browser: browserName, cacheDir, platform });
 
@@ -258,9 +257,60 @@ export async function downloadBrowser(
     throw new Error(`Unknown browser: ${browserName}`);
   }
 
-  throw new Error(
-    `Browser download for Playwright requires the full playwright package or CLI. ` +
-      `Please use: npx playwright install ${browserName}\n` +
-      `Or install the @playwright/test package.`
-  );
+  // 使用指定的 buildId 或配置中的 revision
+  // Use specified buildId or revision from config
+  const buildNumber = options.buildId || browserDesc.revision;
+
+  // 构建下载 URL
+  // Build download URL
+  const downloadURL = getDownloadURL(browserName, buildNumber, hostPlat);
+  const downloadPath = path.join(cacheDir, browserName, buildNumber);
+
+  debugPlaywright('Download URL:', downloadURL);
+  debugPlaywright('Download path:', downloadPath);
+
+  // 检查是否已安装
+  // Check if already installed
+  const existing = await findBrowser({
+    browser,
+    cacheDir,
+    platform,
+  });
+
+  if (existing && existing.buildId === buildNumber) {
+    debugPlaywright('Browser already installed');
+    return existing;
+  }
+
+  // 下载浏览器
+  // Download browser
+  try {
+    await fetchBrowser({
+      browser: browserDesc,
+      buildNumber,
+      downloadPath,
+      downloadURL,
+      platform: hostPlat,
+      progressCallback: options.progressCallback,
+    });
+
+    debugPlaywright('Browser downloaded successfully');
+  } catch (error) {
+    debugPlaywright('Error downloading browser:', error);
+    throw new Error(`Failed to download ${browserName}: ${error instanceof Error ? error.message : String(error)}`);
+  }
+
+  // 查找已下载的浏览器
+  // Find downloaded browser
+  const installed = await findBrowser({
+    browser,
+    cacheDir,
+    platform,
+  });
+
+  if (!installed) {
+    throw new Error('Browser was downloaded but could not be found');
+  }
+
+  return installed;
 }
