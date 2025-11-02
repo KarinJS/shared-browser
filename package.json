@@ -21,6 +21,7 @@
     "test:puppeteer": "node examples/puppeteer-example.js",
     "test:playwright": "node examples/playwright-example.js",
     "test:examples": "node examples/test-basic.js",
+    "typecheck": "tsc --noEmit && tsc --noEmit -p tsconfig.test.json",
     "lint": "eslint src/**/*.ts",
     "format": "prettier --write \"src/**/*.ts\"",
     "prepublishOnly": "pnpm run build"
@@ -38,6 +39,7 @@
     "@types/debug": "^4.1.12",
     "@types/node": "^18.0.0",
     "@types/progress": "^2.0.7",
+    "@types/semver": "^7.7.1",
     "@types/tar-fs": "^2.0.4",
     "@types/yargs": "^17.0.33",
     "@typescript-eslint/eslint-plugin": "^8.0.0",
