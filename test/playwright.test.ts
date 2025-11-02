@@ -16,15 +16,16 @@ import assert from 'node:assert';
 import { playwright } from '../dist/index.js';
 import path from 'node:path';
 import os from 'node:os';
+import type { BrowserType, Platform } from '../dist/index.js';
 
 describe('Playwright Module Tests', () => {
   describe('getDownloadPath()', () => {
     it('应该返回默认缓存目录 / should return default cache directory', () => {
       const downloadPath = playwright.getDownloadPath({
-        browser: 'chromium',
+        browser: 'chromium' as BrowserType,
       });
       
-      let expected;
+      let expected: string;
       if (process.platform === 'win32') {
         expected = path.join(process.env.LOCALAPPDATA || os.homedir(), 'ms-playwright', 'chromium');
       } else {
@@ -37,7 +38,7 @@ describe('Playwright Module Tests', () => {
     it('应该返回指定的缓存目录 / should return specified cache directory', () => {
       const customCache = '/tmp/custom-playwright-cache';
       const downloadPath = playwright.getDownloadPath({
-        browser: 'chromium',
+        browser: 'chromium' as BrowserType,
         cacheDir: customCache,
       });
       
@@ -47,7 +48,7 @@ describe('Playwright Module Tests', () => {
     it('应该返回特定 buildId 的路径 / should return path for specific buildId', () => {
       const buildId = '1097';
       const downloadPath = playwright.getDownloadPath({
-        browser: 'chromium',
+        browser: 'chromium' as BrowserType,
         buildId,
       });
       
@@ -55,7 +56,7 @@ describe('Playwright Module Tests', () => {
     });
 
     it('应该支持不同的浏览器类型 / should support different browser types', () => {
-      const browsers = ['chromium', 'firefox', 'webkit'];
+      const browsers: BrowserType[] = ['chromium', 'firefox', 'webkit'];
       
       browsers.forEach((browser) => {
         const downloadPath = playwright.getDownloadPath({
@@ -70,7 +71,7 @@ describe('Playwright Module Tests', () => {
 
     it('应该正确处理 chrome 到 chromium 的转换 / should correctly handle chrome to chromium conversion', () => {
       const downloadPath = playwright.getDownloadPath({
-        browser: 'chrome', // chrome 应该被转换为 chromium
+        browser: 'chrome' as BrowserType, // chrome 应该被转换为 chromium
       });
       
       assert.ok(downloadPath.includes('chromium'));
@@ -80,7 +81,7 @@ describe('Playwright Module Tests', () => {
   describe('findBrowser()', () => {
     it('应该返回 null 如果浏览器未安装 / should return null if browser not installed', async () => {
       const result = await playwright.findBrowser({
-        browser: 'chromium',
+        browser: 'chromium' as BrowserType,
         cacheDir: '/tmp/non-existent-playwright-cache-' + Date.now(),
       });
       
@@ -88,7 +89,7 @@ describe('Playwright Module Tests', () => {
     });
 
     it('应该接受所有浏览器类型 / should accept all browser types', async () => {
-      const browsers = ['chromium', 'firefox', 'webkit', 'chrome'];
+      const browsers: BrowserType[] = ['chromium', 'firefox', 'webkit', 'chrome'];
       
       for (const browser of browsers) {
         const result = await playwright.findBrowser({
@@ -106,7 +107,7 @@ describe('Playwright Module Tests', () => {
       // 这个测试只验证返回的数据结构
       // This test only validates the returned data structure
       const result = await playwright.findBrowser({
-        browser: 'chromium',
+        browser: 'chromium' as BrowserType,
       });
       
       if (result) {
@@ -125,11 +126,11 @@ describe('Playwright Module Tests', () => {
     });
 
     it('应该支持指定平台参数 / should support platform parameter', async () => {
-      const platforms = ['linux', 'mac', 'mac_arm', 'win64'];
+      const platforms: Platform[] = ['linux', 'mac', 'mac_arm', 'win64'];
       
       for (const platform of platforms) {
         const result = await playwright.findBrowser({
-          browser: 'chromium',
+          browser: 'chromium' as BrowserType,
           platform,
           cacheDir: '/tmp/test-playwright-' + Date.now(),
         });
@@ -142,7 +143,7 @@ describe('Playwright Module Tests', () => {
 
     it('应该正确处理不存在的缓存目录 / should handle non-existent cache directory gracefully', async () => {
       const result = await playwright.findBrowser({
-        browser: 'chromium',
+        browser: 'chromium' as BrowserType,
         cacheDir: '/tmp/definitely-does-not-exist-' + Date.now() + '-' + Math.random(),
       });
       
@@ -154,7 +155,7 @@ describe('Playwright Module Tests', () => {
     it('应该抛出错误提示使用 playwright CLI / should throw error suggesting playwright CLI', async () => {
       try {
         await playwright.downloadBrowser({
-          browser: 'chromium',
+          browser: 'chromium' as BrowserType,
           cacheDir: '/tmp/test-playwright-download-' + Date.now(),
         });
         assert.fail('Should have thrown an error');
@@ -165,7 +166,7 @@ describe('Playwright Module Tests', () => {
     });
 
     it('应该对所有浏览器类型抛出相同的错误 / should throw same error for all browser types', async () => {
-      const browsers = ['chromium', 'firefox', 'webkit'];
+      const browsers: BrowserType[] = ['chromium', 'firefox', 'webkit'];
       
       for (const browser of browsers) {
         try {

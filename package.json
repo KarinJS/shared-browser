@@ -16,8 +16,8 @@
   },
   "scripts": {
     "build": "tsdown",
-    "test": "node --test test/*.test.js",
-    "test:unit": "node --test test/*.test.js",
+    "test": "tsx --test test/*.test.ts",
+    "test:unit": "tsx --test test/*.test.ts",
     "test:puppeteer": "node examples/puppeteer-example.js",
     "test:playwright": "node examples/playwright-example.js",
     "test:examples": "node examples/test-basic.js",
@@ -45,6 +45,7 @@
     "eslint": "^9.0.0",
     "prettier": "^3.0.0",
     "tsdown": "^0.15.12",
+    "tsx": "^4.19.0",
     "typescript": "^5.0.0"
   },
   "dependencies": {

@@ -9,17 +9,18 @@
  * 3. downloadBrowser - 下载浏览器
  */
 
-import { describe, it, before } from 'node:test';
+import { describe, it } from 'node:test';
 import assert from 'node:assert';
 import { puppeteer } from '../dist/index.js';
 import path from 'node:path';
 import os from 'node:os';
+import type { BrowserType, Platform } from '../dist/index.js';
 
 describe('Puppeteer Module Tests', () => {
   describe('getDownloadPath()', () => {
     it('应该返回默认缓存目录 / should return default cache directory', () => {
       const downloadPath = puppeteer.getDownloadPath({
-        browser: 'chrome',
+        browser: 'chrome' as BrowserType,
       });
       
       const expected = path.join(os.homedir(), '.cache', 'shared-browser', 'puppeteer');
@@ -29,7 +30,7 @@ describe('Puppeteer Module Tests', () => {
     it('应该返回指定的缓存目录 / should return specified cache directory', () => {
       const customCache = '/tmp/custom-cache';
       const downloadPath = puppeteer.getDownloadPath({
-        browser: 'chrome',
+        browser: 'chrome' as BrowserType,
         cacheDir: customCache,
       });
       
@@ -39,7 +40,7 @@ describe('Puppeteer Module Tests', () => {
     it('应该返回特定 buildId 的路径 / should return path for specific buildId', () => {
       const buildId = '121.0.6167.85';
       const downloadPath = puppeteer.getDownloadPath({
-        browser: 'chrome',
+        browser: 'chrome' as BrowserType,
         buildId,
       });
       
@@ -47,7 +48,7 @@ describe('Puppeteer Module Tests', () => {
     });
 
     it('应该支持不同的浏览器类型 / should support different browser types', () => {
-      const browsers = ['chrome', 'chromium', 'firefox'];
+      const browsers: BrowserType[] = ['chrome', 'chromium', 'firefox'];
       
       browsers.forEach((browser) => {
         const downloadPath = puppeteer.getDownloadPath({
@@ -60,11 +61,11 @@ describe('Puppeteer Module Tests', () => {
     });
 
     it('应该支持指定平台 / should support specified platform', () => {
-      const platforms = ['linux', 'mac', 'win64'];
+      const platforms: Platform[] = ['linux', 'mac', 'win64'];
       
       platforms.forEach((platform) => {
         const downloadPath = puppeteer.getDownloadPath({
-          browser: 'chrome',
+          browser: 'chrome' as BrowserType,
           platform,
         });
         
@@ -77,7 +78,7 @@ describe('Puppeteer Module Tests', () => {
   describe('findBrowser()', () => {
     it('应该返回 null 如果浏览器未安装 / should return null if browser not installed', async () => {
       const result = await puppeteer.findBrowser({
-        browser: 'chrome',
+        browser: 'chrome' as BrowserType,
         cacheDir: '/tmp/non-existent-cache-' + Date.now(),
       });
       
@@ -85,7 +86,7 @@ describe('Puppeteer Module Tests', () => {
     });
 
     it('应该接受所有浏览器类型 / should accept all browser types', async () => {
-      const browsers = ['chrome', 'chromium', 'firefox', 'chrome-headless-shell'];
+      const browsers: BrowserType[] = ['chrome', 'chromium', 'firefox', 'chrome-headless-shell'];
       
       for (const browser of browsers) {
         const result = await puppeteer.findBrowser({
@@ -103,7 +104,7 @@ describe('Puppeteer Module Tests', () => {
       // 这个测试只验证返回的数据结构
       // This test only validates the returned data structure
       const result = await puppeteer.findBrowser({
-        browser: 'chrome',
+        browser: 'chrome' as BrowserType,
       });
       
       if (result) {
@@ -128,8 +129,8 @@ describe('Puppeteer Module Tests', () => {
       // Test error handling
       try {
         await puppeteer.downloadBrowser({
-          browser: 'chrome',
-          platform: 'invalid-platform',
+          browser: 'chrome' as BrowserType,
+          platform: 'invalid-platform' as Platform,
           cacheDir: '/tmp/test-download-' + Date.now(),
         });
         assert.fail('Should have thrown an error');
@@ -144,9 +145,9 @@ describe('Puppeteer Module Tests', () => {
       // 这个测试不会实际下载，只是验证参数
       // This test won't actually download, just validates parameters
       const options = {
-        browser: 'chrome',
+        browser: 'chrome' as BrowserType,
         cacheDir: '/tmp/test-download-' + Date.now(),
-        progressCallback: (downloaded, total) => {
+        progressCallback: (downloaded: number, total: number) => {
           callbackCalled = true;
           assert.strictEqual(typeof downloaded, 'number');
           assert.strictEqual(typeof total, 'number');
@@ -161,7 +162,7 @@ describe('Puppeteer Module Tests', () => {
 
     it('应该接受 buildId 参数 / should accept buildId parameter', () => {
       const options = {
-        browser: 'chrome',
+        browser: 'chrome' as BrowserType,
         buildId: '121.0.6167.85',
         cacheDir: '/tmp/test-download-' + Date.now(),
       };
@@ -171,7 +172,7 @@ describe('Puppeteer Module Tests', () => {
     });
 
     it('应该支持不同的浏览器类型 / should support different browser types', () => {
-      const browsers = ['chrome', 'chromium', 'firefox'];
+      const browsers: BrowserType[] = ['chrome', 'chromium', 'firefox'];
       
       browsers.forEach((browser) => {
         const options = {
