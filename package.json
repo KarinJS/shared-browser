@@ -16,9 +16,11 @@
   },
   "scripts": {
     "build": "tsdown",
-    "test": "node examples/test-basic.js",
+    "test": "node --test test/*.test.js",
+    "test:unit": "node --test test/*.test.js",
     "test:puppeteer": "node examples/puppeteer-example.js",
     "test:playwright": "node examples/playwright-example.js",
+    "test:examples": "node examples/test-basic.js",
     "lint": "eslint src/**/*.ts",
     "format": "prettier --write \"src/**/*.ts\"",
     "prepublishOnly": "pnpm run build"
