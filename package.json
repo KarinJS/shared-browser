@@ -16,9 +16,12 @@
   },
   "scripts": {
     "build": "tsc",
-    "test": "echo \"Error: no test specified\" && exit 1",
+    "test": "node examples/test-basic.js",
+    "test:puppeteer": "node examples/puppeteer-example.js",
+    "test:playwright": "node examples/playwright-example.js",
     "lint": "eslint src/**/*.ts",
-    "format": "prettier --write \"src/**/*.ts\""
+    "format": "prettier --write \"src/**/*.ts\"",
+    "prepublishOnly": "pnpm run build"
   },
   "keywords": [
     "puppeteer",
